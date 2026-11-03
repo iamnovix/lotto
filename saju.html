@@ -115,7 +115,8 @@ progress { width: 160px; }
 .sharebtn { flex: none; display: inline-flex; align-items: center; gap: 5px; height: 36px; padding: 0 12px; border: 0; border-radius: 999px; background: #fee500; color: #191919; font: inherit; font-weight: 800; font-size: 13px; cursor: pointer; box-shadow: 0 1px 2px rgba(0,0,0,.12); }
 .sharebtn:active { transform: scale(.96); }
 .sharetoast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); max-width: calc(100% - 32px); background: rgba(25,25,25,.92); color: #fff; font-size: 13px; line-height: 1.5; padding: 10px 14px; border-radius: 10px; z-index: 50; text-align: center; }
-@media (max-width: 400px) { .sharebtn { width: 36px; padding: 0; justify-content: center; } .sharebtn span { display: none; } .brand span { font-size: clamp(14px, 4.3vw, 20px); } }
+@media (max-width: 480px) { .sharebtn { width: 36px; padding: 0; justify-content: center; } .sharebtn span { display: none; } .brand span { font-size: clamp(14px, 4.3vw, 20px); } }
+.ios-app .storebar, .ios-app .storetip, .ios-app .installbar, .ios-app .donate { display: none !important; }
 .storebar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin: -2px 0 12px; }
 .storebar[hidden] { display: none; }
 .store { display: inline-flex; height: 44px; border-radius: 8px; text-decoration: none; }
@@ -138,7 +139,7 @@ progress { width: 160px; }
   .topnav { gap: 8px; }
   .topnav a { flex: 1 1 0; min-width: 0; text-align: center; padding: 9px 4px; font-size: clamp(12px, 3.6vw, 14px); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 }
-@media (max-width: 400px) {
+@media (max-width: 480px) {
   .topnav .x { display: none; }
   .foot { line-height: 1.7; }
 }.settings summary { list-style: none; cursor: pointer; }
@@ -192,6 +193,17 @@ progress { width: 160px; }
   .ohaeng { gap: 4px; }
 }
 </style>
+<script>
+// iPhone 앱(App Store) 안에서는 다른 스토어 버튼·설치 안내·후원계좌를 숨긴다 (애플 심사 규정)
+(function () {
+  let ios = false;
+  try {
+    if (/[?&]source=ios\b/.test(location.search)) sessionStorage.setItem('iosApp', '1');
+    ios = sessionStorage.getItem('iosApp') === '1' || /app-platform=iOS App Store/.test(document.cookie);
+  } catch (e) { ios = /[?&]source=ios\b/.test(location.search); }
+  if (ios) document.documentElement.classList.add('ios-app');
+})();
+</script>
 </head>
 <body>
 <div class="wrap">
@@ -266,7 +278,7 @@ progress { width: 160px; }
     </div>
   </div>
 
-<p class="foot">여러분의 후원은 개발자에게 큰 도움이 됩니다.<br>후원계좌: 카카오뱅크 3333-01-4475921 <span class="nw">(예금주: 최성욱)</span><br>데이터 출처: 동행복권 · 매주 토요일 추첨 후 자동 갱신 · <a href="privacy.html" style="color:inherit">개인정보처리방침</a></p>
+<p class="foot"><span class="donate">여러분의 후원은 개발자에게 큰 도움이 됩니다.<br>후원계좌: 카카오뱅크 3333-01-4475921 <span class="nw">(예금주: 최성욱)</span><br></span>데이터 출처: 동행복권 · 매주 토요일 추첨 후 자동 갱신 · <a href="privacy.html" style="color:inherit">개인정보처리방침</a></p>
 </div>
 
 <script src="data/lotto.js"></script>
