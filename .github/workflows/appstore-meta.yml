@@ -4,6 +4,11 @@ name: App Store 스토어 정보 올리기
 
 on:
   workflow_dispatch:
+    inputs:
+      skip_metadata:
+        description: "글(설명·키워드)은 건너뛰고 스크린샷만 올리기"
+        type: boolean
+        default: false
 
 jobs:
   upload-metadata:
@@ -27,6 +32,8 @@ jobs:
           PY
 
       - name: 스토어 정보·스크린샷 업로드
+        env:
+          SKIP_METADATA: ${{ inputs.skip_metadata }}
         run: |
           fastlane deliver \
             --api_key_path "$RUNNER_TEMP/keys/asc.json" \
@@ -36,6 +43,7 @@ jobs:
             --metadata_path appstore/metadata \
             --screenshots_path appstore/screenshots \
             --overwrite_screenshots true \
+            --skip_metadata "${SKIP_METADATA:-false}" \
             --skip_binary_upload true \
             --skip_app_version_update true \
             --force true \
