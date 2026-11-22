@@ -1,0 +1,119 @@
+# iOS 앱을 GitHub의 Mac 서버에서 빌드해 App Store Connect(TestFlight)에 올린다.
+# Actions 탭 > "iOS 앱 빌드 및 TestFlight 업로드" > Run workflow 로 직접 실행한다.
+# 필요한 비밀값(저장소 Settings > Secrets and variables > Actions):
+#   APPLE_TEAM_ID   : 애플 개발자 팀 ID (10자리)
+#   ASC_KEY_ID      : App Store Connect API 키 ID
+#   ASC_ISSUER_ID   : App Store Connect API 발급자(Issuer) ID
+#   ASC_KEY_P8      : 내려받은 AuthKey_XXXX.p8 파일의 내용 전체
+name: iOS 앱 빌드 및 TestFlight 업로드
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: ios-build
+  cancel-in-progress: false
+
+jobs:
+  build-ios:
+    runs-on: macos-15
+    timeout-minutes: 60
+    env:
+      SCHEME: 두꺼비로또
+      WORKSPACE: 두꺼비로또.xcworkspace
+      MARKETING_VERSION: 1.0.0
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 비밀값 확인
+        env:
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          ASC_KEY_P8: ${{ secrets.ASC_KEY_P8 }}
+        run: |
+          missing=""
+          for v in APPLE_TEAM_ID ASC_KEY_ID ASC_ISSUER_ID ASC_KEY_P8; do
+            if [ -z "${!v}" ]; then missing="$missing $v"; fi
+          done
+          if [ -n "$missing" ]; then echo "::error::비밀값이 없습니다:$missing"; exit 1; fi
+          echo "비밀값 4개 확인 완료"
+
+      - name: 최신 Xcode 선택
+        run: |
+          latest=$(ls -d /Applications/Xcode_*.app 2>/dev/null | grep -v -i beta | sort -V | tail -n 1)
+          if [ -n "$latest" ]; then sudo xcode-select -s "$latest"; fi
+          xcodebuild -version
+
+      - name: 프로젝트 풀기
+        run: |
+          mkdir -p "$RUNNER_TEMP/ios"
+          unzip -q ios/ios-project.zip -d "$RUNNER_TEMP/ios"
+          ls "$RUNNER_TEMP/ios/src"
+
+      - name: CocoaPods 설치
+        working-directory: ${{ runner.temp }}/ios/src
+        run: pod install --repo-update
+
+      - name: API 키 준비
+        env:
+          ASC_KEY_P8: ${{ secrets.ASC_KEY_P8 }}
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/keys"
+          printf '%s\n' "$ASC_KEY_P8" > "$RUNNER_TEMP/keys/AuthKey_${ASC_KEY_ID}.p8"
+          chmod 600 "$RUNNER_TEMP/keys/AuthKey_${ASC_KEY_ID}.p8"
+
+      - name: 아카이브 (빌드 + 서명)
+        working-directory: ${{ runner.temp }}/ios/src
+        env:
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+        run: |
+          xcodebuild archive \
+            -workspace "$WORKSPACE" -scheme "$SCHEME" -configuration Release \
+            -destination 'generic/platform=iOS' \
+            -archivePath "$RUNNER_TEMP/app.xcarchive" \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath "$RUNNER_TEMP/keys/AuthKey_${ASC_KEY_ID}.p8" \
+            -authenticationKeyID "$ASC_KEY_ID" \
+            -authenticationKeyIssuerID "$ASC_ISSUER_ID" \
+            DEVELOPMENT_TEAM="$APPLE_TEAM_ID" \
+            CODE_SIGN_STYLE=Automatic \
+            MARKETING_VERSION="$MARKETING_VERSION" \
+            CURRENT_PROJECT_VERSION="${{ github.run_number }}"
+
+      - name: App Store Connect 업로드
+        env:
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+        run: |
+          cat > "$RUNNER_TEMP/ExportOptions.plist" <<EOF
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>method</key><string>app-store-connect</string>
+            <key>destination</key><string>upload</string>
+            <key>teamID</key><string>${APPLE_TEAM_ID}</string>
+            <key>signingStyle</key><string>automatic</string>
+            <key>uploadSymbols</key><true/>
+            <key>manageAppVersionAndBuildNumber</key><false/>
+          </dict>
+          </plist>
+          EOF
+          xcodebuild -exportArchive \
+            -archivePath "$RUNNER_TEMP/app.xcarchive" \
+            -exportOptionsPlist "$RUNNER_TEMP/ExportOptions.plist" \
+            -exportPath "$RUNNER_TEMP/export" \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath "$RUNNER_TEMP/keys/AuthKey_${ASC_KEY_ID}.p8" \
+            -authenticationKeyID "$ASC_KEY_ID" \
+            -authenticationKeyIssuerID "$ASC_ISSUER_ID"
+          echo "업로드 완료: 버전 ${MARKETING_VERSION} (빌드 ${{ github.run_number }}). App Store Connect > TestFlight 에서 10~30분 뒤 처리 완료를 확인하세요."
+
+      - name: 키 파일 삭제
+        if: always()
+        run: rm -rf "$RUNNER_TEMP/keys"
