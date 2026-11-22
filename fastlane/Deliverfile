@@ -1,0 +1,2 @@
+# 스토어 정보 업로드 설정 (실제 값은 .github/workflows/appstore-meta.yml 의 명령줄 옵션에 있음)
+app_identifier("kr.brightbom.lotto")
