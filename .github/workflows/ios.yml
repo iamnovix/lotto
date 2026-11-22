@@ -48,7 +48,7 @@ jobs:
       - name: 프로젝트 풀기
         run: |
           mkdir -p "$RUNNER_TEMP/ios"
-          unzip -q ios/ios-project.zip -d "$RUNNER_TEMP/ios"
+          ditto -x -k ios/ios-project.zip "$RUNNER_TEMP/ios"
           ls "$RUNNER_TEMP/ios/src"
 
       - name: CocoaPods 설치
